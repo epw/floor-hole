@@ -3,6 +3,23 @@
 import re
 import sys
 
+def out_pair(pair):
+    return "<%g,%g>" % (pair[0], pair[1])
+
+def declaration(points):
+    print "#declare POINTS = array[%d] {" % ((len(points)-1) * 3)
+    maybe_comma = ","
+    for i in range(len(points[:-1])):
+        if i == len(points) - 2:
+            maybe_comma = ""
+        print "%s, %s, %s%s" % (out_pair(points[i+1][0]),
+                                out_pair(points[i+1][1]),
+                                out_pair(points[i][-1]), maybe_comma)
+    print "};"
+
+def avg(x, y):
+    return (x + y) / 2
+
 def svg_to_pov():
     started = False
     extremes = {}
@@ -28,7 +45,6 @@ def svg_to_pov():
         extremes["min_x"] = extremes["max_x"] = points[0][0][0]
         extremes["min_y"] = extremes["max_y"] = points[0][0][1]
         line = f.readline()
-        print line
         regex = re.search(r"C ([0-9.]+),([0-9.]+) ([0-9.]+),([0-9.]+) ([0-9.]+),([0-9.]+)", line)
         assert(regex)
         points.append([(float(regex.group(1)), float(regex.group(2))),
@@ -42,20 +58,28 @@ def svg_to_pov():
             for pair in pairs:
                 if pair.strip() == "Z":
                     close = True
-                    point_list.append(points[0])
+                    points.append(point_list)
+                    adjust_extremes(points[-1][2][0], points[-1][2][1])
+#                    points.append(points[0])
                     break
                 pair = pair.split(",")
                 point_list.append((float(pair[0]), float(pair[1])))
-            points.append(point_list)
-            adjust_extremes(points[-1][2][0], points[-1][2][1])
-            if close:
+            if not close:
+                points.append(point_list)
+                adjust_extremes(points[-1][2][0], points[-1][2][1])
+            else:
                 break
         sys.stderr.write("Not handling anything after first Close operation\n")
-    print len(points)
-    print extremes
+    middle_x = avg(extremes["min_x"], extremes["max_x"])
+    middle_y = avg(extremes["min_y"], extremes["max_y"])
+    
+    normalized_points = [[(pair[0] - middle_x, pair[1] - middle_y) for pair in pairs] for pairs in points]
+    print "#declare POINTS = array[%d] {" % len(points)
+    print ",\n".join(["<%g, %g>" % (p[0], p[1]) for p in [pair[-1] for pair in normalized_points]])
+    print "};"
 
 def main():
-    print svg_to_pov()
+    svg_to_pov()
 
 if __name__ == "__main__":
     main()
